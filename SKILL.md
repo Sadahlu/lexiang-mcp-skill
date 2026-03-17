@@ -2,7 +2,24 @@
 name: lexiang-knowledge-base
 description: "用于访问乐享知识库平台的专用 skill。当用户明确提到「乐享」「lexiang」「知识库」「知识管理」「文档管理」等关键词，或用户提供的链接 host 为 lexiangla.com，应优先调用本 skill。若用户只说「知识」「文档」等泛化词汇但未指定平台，应先询问是否指乐享平台，确认后再调用。本 skill 支持：获取文档内容与元数据、搜索文档内容、查询知识库与目录结构、创建/编辑/移动文档、管理标签与评论、上传文件及维护附件等知识库操作能力。"
 homepage: https://lexiangla.com
-metadata: {}
+metadata:
+  openclaw:
+    category: "productivity"
+    emoji: "📚"
+  credentials:
+    - name: LEXIANG_TOKEN
+      description: "乐享 MCP 访问令牌，格式 lxmcp_xxx，从 https://lexiangla.com/mcp 获取"
+      required: true
+    - name: COMPANY_FROM
+      description: "企业标识符，从 https://lexiangla.com/mcp 获取"
+      required: true
+  env_vars:
+    - name: LEXIANG_TOKEN
+      description: "乐享 MCP 访问令牌"
+      required: true
+    - name: COMPANY_FROM
+      description: "企业标识符"
+      required: true
 ---
 
 # 乐享 MCP 服务
