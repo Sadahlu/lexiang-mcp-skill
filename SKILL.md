@@ -29,7 +29,7 @@ metadata: { "openclaw": { "category": "productivity", "emoji": "📚", "requires
 
 当调用 MCP 连接失败或无认证信息时：
 
-1. 告知用户需要获取乐享 MCP 的 access_token
+1. 告知用户需要获取乐享 MCP 的 `LEXIANG_TOKEN`
 2. 引导用户打开 `https://lexiangla.com/mcp` 获取配置信息
 3. 用户获取后，帮助完成 mcp.json 配置（参见「快速开始」）
 
@@ -55,12 +55,12 @@ https://lexiangla.com/mcp?action=renew&company_from={company_from}
 ```
 🔒 您的乐享访问令牌已过期。请打开以下链接创建新会话：
 https://lexiangla.com/mcp?action=recreate&company_from={company_from}
-创建后请将新的 access_token 提供给我进行更新。
+创建后请将新的 LEXIANG_TOKEN 提供给我进行更新。
 ```
 
 ### 租户隔离规则
 
-- `company_from` 和 `access_token` **必须属于同一租户**，不同租户的 token 不能混用
+- `COMPANY_FROM` 和 `LEXIANG_TOKEN` **必须属于同一租户**，不同租户的 token 不能混用
 - OAuth 不支持跨租户授权
 - 续期或重建 token 时，URL 中的 `company_from` 必须与当前配置一致
 - 如果用户切换了企业/租户，必须重新获取对应租户的 token
@@ -192,8 +192,8 @@ https://lexiangla.com/pages/{entry_id}?company_from={company_from}
 访问：https://lexiangla.com/mcp
 
 登录后获取：
-- **company_from**：你的企业标识
-- **access_token**：访问令牌（格式 `lxmcp_xxx`）
+- **COMPANY_FROM**：你的企业标识
+- **LEXIANG_TOKEN**：访问令牌（格式 `lxmcp_xxx`）
 
 ### 配置方式
 
@@ -297,6 +297,8 @@ export LEXIANG_TOKEN="lxmcp_YOUR_TOKEN_HERE"
 ### 📎 文件管理
 - `file_apply_upload` — 申请文件上传（返回 upload_url 和 session_id）
 - `file_commit_upload` — 确认上传完成
+- `file_describe_file` — 获取文件详情
+- `file_download_file` — 下载文件
 
 ### 🧩 Block 操作
 - `block_convert_content_to_blocks` — Markdown/HTML 转 Block 结构
@@ -396,6 +398,114 @@ export LEXIANG_TOKEN="lxmcp_YOUR_TOKEN_HERE"
 
 > 如果用户只是想阅读或总结内容，不要默认导入。
 
+### 文件上传完整流程（三步）
+
+> ⚠️ **必须严格按顺序执行以下三步，缺一不可。**
+
+**Step 1: 申请上传凭证（MCP 调用）**
+
+```
+MCP Tool: file_apply_upload
+Arguments: {
+  "parent_entry_id": "<目标目录的 entry_id>",
+  "name": "example.pdf",
+  "size": 12345,
+  "mime_type": "application/pdf",
+  "upload_type": "PRE_SIGNED_URL"
+}
+```
+
+必填参数说明：
+
+| 参数 | 说明 | 获取方式 |
+|------|------|----------|
+| `parent_entry_id` | 目标目录的 entry_id | 从知识库 URL 提取 `space_id`，或通过 `entry_list_entries` 查找 |
+| `name` | 文件名（含扩展名） | 本地文件名 |
+| `size` | 文件大小（**字节数，必填**） | 通过 `wc -c <文件>` 或 `stat -f%z <文件>` 获取 |
+| `mime_type` | MIME 类型 | 见下方常见类型表 |
+| `upload_type` | 固定填 `"PRE_SIGNED_URL"` | — |
+
+返回值包含 `session.session_id` 和 `session.upload_url`。
+
+**Step 2: HTTP PUT 上传文件内容（curl 命令，非 MCP）**
+
+> ⚠️ **这一步不是 MCP 调用，必须用 curl 命令执行 HTTP PUT 请求。**
+
+```bash
+curl -X PUT \
+  -H "Content-Type: <mime_type>" \
+  --data-binary "@<本地文件路径>" \
+  "<Step 1 返回的 upload_url>"
+```
+
+实际示例：
+
+```bash
+# 上传 PDF 文件
+curl -X PUT \
+  -H "Content-Type: application/pdf" \
+  --data-binary "@/path/to/example.pdf" \
+  "https://cos.example.com/upload?sign=xxx"
+
+# 上传图片
+curl -X PUT \
+  -H "Content-Type: image/png" \
+  --data-binary "@/path/to/screenshot.png" \
+  "https://cos.example.com/upload?sign=xxx"
+```
+
+curl 参数说明：
+- `-X PUT`：必须是 PUT 方法（不是 POST）
+- `--data-binary`：必须用 `--data-binary`（不是 `-d` 或 `--data`），保持二进制完整性
+- `@文件路径`：`@` 前缀表示读取文件内容，路径必须用绝对路径
+- `Content-Type`：必须与 Step 1 中的 `mime_type` 一致
+
+成功标志：curl 返回 HTTP 200 或空响应（无报错）
+
+**Step 3: 确认上传完成（MCP 调用）**
+
+```
+MCP Tool: file_commit_upload
+Arguments: {
+  "session_id": "<Step 1 返回的 session_id>"
+}
+```
+
+返回值包含新文件的 `entry_id`，上传完成。
+
+### 常用 MIME 类型速查
+
+| 文件类型 | 扩展名 | mime_type |
+|----------|--------|-----------|
+| PDF | .pdf | `application/pdf` |
+| Word | .docx | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` |
+| Excel | .xlsx | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` |
+| PPT | .pptx | `application/vnd.openxmlformats-officedocument.presentationml.presentation` |
+| 图片 PNG | .png | `image/png` |
+| 图片 JPG | .jpg/.jpeg | `image/jpeg` |
+| Markdown | .md | `text/markdown` |
+| 文本 | .txt | `text/plain` |
+| ZIP | .zip | `application/zip` |
+
+### 更新已有文件
+
+更新文件需要额外的 `file_id` 参数，且 `parent_entry_id` 填**文件自身的 entry_id**（不是父目录）。
+
+1. 先获取 file_id：`entry_describe_entry(entry_id=<文件的 entry_id>)` → 返回值中 `target_id` 就是 `file_id`
+2. 调用 `file_apply_upload` 时额外传入 `file_id` 参数
+3. 同样执行 Step 2（curl PUT）和 Step 3（commit_upload）
+
+### 文件上传常见错误
+
+| 错误 | 原因 | 修复 |
+|------|------|------|
+| apply_upload 失败 | 缺少 `size` 参数 | **必须传文件字节数** |
+| curl PUT 返回 403 | upload_url 过期或格式错误 | 重新执行 Step 1 获取新 URL |
+| curl PUT 上传 0 字节 | 用了 `-d` 而不是 `--data-binary` | 改用 `--data-binary "@文件"` |
+| commit 后文件为空 | 跳过了 Step 2 | 必须先 curl PUT 上传文件内容 |
+| 更新文件变成新建 | 没传 `file_id` | 更新时必须传 `file_id` |
+| 更新时 parent_entry_id 错误 | 填了父目录 ID | 更新时填**文件自身的 entry_id** |
+
 ---
 
 ## 常见使用场景
@@ -443,11 +553,14 @@ call_tool("block_create_block_descendant", {
 ### 场景4: 上传文件（3 步）
 
 ```
-Step 1: call_tool("file_apply_upload", {"parent_entry_id": "folder123", "name": "README.md", "size": 1024})
+Step 1: call_tool("file_apply_upload", {"parent_entry_id": "folder123", "name": "README.md", "size": 1024, "mime_type": "text/markdown", "upload_type": "PRE_SIGNED_URL"})
         → 返回 upload_url, session_id
-Step 2: HTTP PUT upload_url（上传文件内容，非 MCP 调用）
+Step 2: 用 curl 命令执行 HTTP PUT（非 MCP 调用）：
+        curl -X PUT -H "Content-Type: text/markdown" --data-binary "@/path/to/README.md" "<upload_url>"
 Step 3: call_tool("file_commit_upload", {"session_id": "..."})
 ```
+
+> ⚠️ Step 2 必须用 `curl -X PUT --data-binary`（不是 `-d`），参见 SKILL.md「文件上传完整流程」。
 
 ### 场景5: 读取 Block 内容
 
@@ -496,7 +609,7 @@ call_tool("block_update_blocks", {
 1. **Block ID 映射**：`block_id` 为客户端临时 ID，服务端返回实际 ID 映射
 2. **叶子节点限制**：标题、代码块、图片等不支持 children 字段
 3. **容器节点要求**：callout、table、column_list 等必须指定 children
-4. **文件上传大小**：必须获取准确的文件大小（字节数）
+4. **文件上传**：必须获取准确的文件大小（字节数），Step 2 必须用 `curl -X PUT --data-binary` 执行（非 MCP 调用）
 5. **`_mcp_fields` 优化**：所有工具支持 `_mcp_fields` 参数选择返回字段，减少 token 消耗
 
 > **更多细节**：见 `references/common-errors.md` 和 `references/markdown-import.md`。

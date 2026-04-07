@@ -8,14 +8,14 @@
 
 | 参数 | 说明 | 格式示例 |
 |------|------|----------|
-| `company_from` | 企业标识 | `your_company` |
-| `access_token` | 访问令牌 | `lxmcp_xxx` |
+| `COMPANY_FROM` | 企业标识 | `your_company` |
+| `LEXIANG_TOKEN` | 访问令牌 | `lxmcp_xxx` |
 
 ## 配置步骤
 
 ### Step 1: 获取用户参数
 
-向用户询问 `company_from` 和 `access_token`。如果用户不清楚，引导其访问：
+向用户询问 `COMPANY_FROM` 和 `LEXIANG_TOKEN`。如果用户不清楚，引导其访问：
 
 ```
 https://lexiangla.com/mcp
@@ -42,23 +42,23 @@ https://lexiangla.com/mcp
 ### Step 4: 创建目录并写入配置
 
 1. 如果 `.mcporter` 目录不存在，创建它
-2. 将以下 JSON 写入配置文件（替换 `{company_from}` 和 `{access_token}` 为用户提供的实际值）：
+2. 将以下 JSON 写入配置文件（替换 `{COMPANY_FROM}` 和 `{LEXIANG_TOKEN}` 为用户提供的实际值）：
 
 ```json
 {
   "mcpServers": {
     "lexiang": {
-      "url": "https://mcp.lexiang-app.com/mcp?company_from={company_from}",
+      "url": "https://mcp.lexiang-app.com/mcp?company_from={COMPANY_FROM}",
       "transportType": "streamable-http",
       "headers": {
-        "Authorization": "Bearer {access_token}"
+        "Authorization": "Bearer {LEXIANG_TOKEN}"
       }
     }
   }
 }
 ```
 
-**安全说明**：access_token 通过 HTTP Authorization header 传递，避免在 URL 中暴露（URL 可能被记录到日志、Referer 头中）。
+**安全说明**：LEXIANG_TOKEN 通过 HTTP Authorization header 传递，避免在 URL 中暴露（URL 可能被记录到日志、Referer 头中）。
 
 **编码要求**：文件必须以 UTF-8 无 BOM 编码保存。
 
@@ -95,6 +95,6 @@ https://lexiangla.com/mcp
 
 ## 注意事项
 
-- 不要在输出中回显 access_token 的完整值（安全考虑）
+- 不要在输出中回显 LEXIANG_TOKEN 的完整值（安全考虑）
 - 如果已有配置文件包含其他 mcpServers 条目，应合并而非覆盖整个文件
 - Windows 环境下注意路径分隔符使用 `\`
